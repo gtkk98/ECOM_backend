@@ -2,9 +2,14 @@ import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 
 const app = new Hono();
+const startedAt = Date.now();
 
-app.get("/", (c) => {
-  return c.text("Hello Hono!");
+app.get("/health", (c) => {
+  return c.json({
+    status:"ok",
+    uptime: Math.floor((Date.now() - startedAt) / 1000),
+    timestamp:Date.now()
+  });
 });
 
 const start = async () => {

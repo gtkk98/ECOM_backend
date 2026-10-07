@@ -123,9 +123,26 @@ textarea:focus-visible {
   color: var(--muted);
 }
 
+.auth-page {
+  display: grid;
+  min-height: min(720px, calc(100svh - 180px));
+  place-items: center;
+  padding: 3rem 0;
+}
+
+.auth-card {
+  width: min(100%, 440px);
+  margin-inline: auto;
+}
+
 @media (max-width: 640px) {
   .site-shell {
     width: min(100% - 1.25rem, 1320px);
+  }
+
+  .auth-page {
+    min-height: auto;
+    padding: 2rem 0;
   }
 }
 
