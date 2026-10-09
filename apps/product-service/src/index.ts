@@ -2,6 +2,9 @@ import express, { Request, Response } from "express";
 import cors from "cors";
 import { clerkMiddleware, getAuth } from "@clerk/express";
 import { shouldBeUser } from "./middleware/authMiddleware.js";
+import productRouter from "./routes/product.route.js"
+import categroyRouter from "./routes/category.route.js"
+
 const startedAt = Date.now();
 const app = express();
 app.use(
@@ -22,8 +25,11 @@ app.get("/health", (req: Request, res: Response) => {
 });
 
 app.get("/test", shouldBeUser, (req, res) => {
-  res.json({ message: "Product service authenticated", userId:req.userId });
+  res.json({ message: "Product service authenticated", userId: req.userId });
 });
+
+app.use("/products", productRouter);
+app.use("/categories", categroyRouter);
 
 app.listen(8000, () => {
   console.log("Product Service is running");
