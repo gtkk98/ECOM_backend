@@ -49,7 +49,9 @@ export const getProducts = async (req: Request, res: Response) => {
 
   const isPriceSort = sort === "asc" || sort === "desc";
   const orderBy: Prisma.ProductOrderByWithRelationInput =
-    sort === "oldest" ? { createdAt: Prisma.SortOrder.asc } : { createdAt: Prisma.SortOrder.desc };
+    sort === "oldest"
+      ? { createdAt: Prisma.SortOrder.asc }
+      : { createdAt: Prisma.SortOrder.desc };
 
   const products = await prisma.product.findMany({
     where,
@@ -60,7 +62,9 @@ export const getProducts = async (req: Request, res: Response) => {
     products.sort((firstProduct, secondProduct) => {
       const firstPrice = getFirstPortionPrice(firstProduct.portions);
       const secondPrice = getFirstPortionPrice(secondProduct.portions);
-      return sort === "asc" ? firstPrice - secondPrice : secondPrice - firstPrice;
+      return sort === "asc"
+        ? firstPrice - secondPrice
+        : secondPrice - firstPrice;
     });
   }
 
@@ -79,4 +83,12 @@ const getFirstPortionPrice = (portions: Prisma.JsonValue): number => {
   const price = (portions[0] as { price?: unknown } | undefined)?.price;
   return typeof price === "number" && Number.isFinite(price) ? price : 0;
 };
-export const getProduct = async (req: Request, res: Response) => {};
+export const getProduct = async (req: Request, res: Response) => {
+  const { id } = req.params;
+
+  const product = await prisma.product.findUnique({
+    where: { id: Number(id) },
+  });
+
+  return res.status(200).json(product)
+};
