@@ -1,59 +1,25 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import {
-  ArrowRight,
-  CalendarDays,
-  MapPin,
-  PackageCheck,
-  ReceiptText,
-  Truck,
-} from "lucide-react";
+import { auth } from "@clerk/nextjs/server";
+import { ArrowRight, PackageCheck, ReceiptText, Truck } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "My orders",
-  description: "Track recent food orders, delivery status, and order details for your ChowUp account.",
+  description:
+    "Track recent food orders, delivery status, and order details for your ChowUp account.",
 };
 
-const orders = [
-  {
-    id: "#1042",
-    date: "May 18, 2026",
-    total: 52.38,
-    status: "Delivered",
-    eta: "Delivered at 7:42 PM",
-    location: "Downtown, Seattle",
-    items: ["Pepperoni Pizza", "Crispy Fries", "House Soda"],
-  },
-  {
-    id: "#1038",
-    date: "May 12, 2026",
-    total: 26.95,
-    status: "In transit",
-    eta: "Arrives by 6:20 PM",
-    location: "Capitol Hill, Seattle",
-    items: ["Mushroom Fettuccine", "Garlic Bread"],
-  },
-  {
-    id: "#1031",
-    date: "May 08, 2026",
-    total: 41.79,
-    status: "Preparing",
-    eta: "Kitchen is finishing your order",
-    location: "Queen Anne, Seattle",
-    items: ["Double Cheeseburger", "Coke", "Brownie"],
-  },
-];
+type Order = {
+  _id: string;
+  amount: number;
+  status: "success" | "failed";
+  products: { name: string; quantity: number; price: number }[];
+  createdAt: string;
+};
 
-const summary = [
-  { label: "Total spent", value: "$418.24", icon: ReceiptText },
-  { label: "Waiting on", value: "1 order", icon: Truck },
-  { label: "Delivered", value: "8 this month", icon: PackageCheck },
-];
-
-const statusClasses: Record<string, string> = {
-  Delivered: "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-600/20",
-  "In transit": "bg-amber-500/10 text-amber-700 ring-1 ring-amber-600/20",
-  Preparing: "bg-blue-500/10 text-blue-700 ring-1 ring-blue-600/20",
+const statusClasses: Record<Order["status"], string> = {
+  success: "bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-600/20",
+  failed: "bg-red-500/10 text-red-700 ring-1 ring-red-600/20",
 };
 
 const formatCurrency = (value: number) =>
@@ -62,7 +28,60 @@ const formatCurrency = (value: number) =>
     currency: "USD",
   }).format(value);
 
-const OrdersPage = () => {
+const OrdersPage = async () => {
+  const { userId, getToken } = await auth();
+
+  if (!userId) {
+    return (
+      <main className="mx-auto max-w-6xl px-4 py-16 text-center sm:px-6 lg:px-8">
+        <h1 className="text-3xl font-semibold text-foreground">Sign in to view your orders</h1>
+        <p className="mt-3 text-(--muted)">Your order history is available after you sign in.</p>
+      </main>
+    );
+  }
+
+  const token = await getToken();
+  if (!token) {
+    throw new Error("Unable to get an authentication token for the order service.");
+  }
+
+  const orderServiceUrl = (process.env.ORDER_SERVICE_URL ?? "http://localhost:8001").replace(
+    /\/+$/,
+    "",
+  );
+  let orders: Order[] = [];
+  let loadError: string | null = null;
+
+  try {
+    const response = await fetch(`${orderServiceUrl}/user-orders`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      loadError = `Order service returned ${response.status}. Please try again later.`;
+    } else {
+      const result: unknown = await response.json();
+      if (!Array.isArray(result)) {
+        throw new Error("Order service returned an invalid order list.");
+      }
+      orders = result;
+    }
+  } catch (error) {
+    loadError =
+      error instanceof Error
+        ? error.message
+        : "Unable to load orders from the order service.";
+  }
+
+  const successfulOrders = orders.filter((order) => order.status === "success");
+  const totalSpent = successfulOrders.reduce((total, order) => total + order.amount, 0);
+  const summary = [
+    { label: "Total orders", value: String(orders.length), icon: ReceiptText },
+    { label: "Successful", value: String(successfulOrders.length), icon: PackageCheck },
+    { label: "Total spent", value: formatCurrency(totalSpent), icon: Truck },
+  ];
+
   return (
     <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="mb-8 flex flex-col gap-5 border-b border-(--line) pb-8 md:flex-row md:items-end md:justify-between">
@@ -79,90 +98,89 @@ const OrdersPage = () => {
         </Link>
       </div>
 
-      <section className="mb-8 grid gap-4 md:grid-cols-3">
-        {summary.map(({ label, value, icon: Icon }) => (
-          <div
-            key={label}
-            className="rounded-2xl border border-(--line) bg-(--surface) p-5 shadow-[0_10px_30px_rgb(17_24_39/04)]"
-          >
-            <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-(--surface-tint) text-(--brand)">
-              <Icon className="h-4 w-4" />
+      {loadError ? (
+        <p role="alert" className="rounded-xl border border-red-300 bg-red-50 p-4 text-red-800">
+          {loadError}
+        </p>
+      ) : (
+        <>
+          <section className="mb-8 grid gap-4 md:grid-cols-3">
+            {summary.map(({ label, value, icon: Icon }) => (
+              <div
+                key={label}
+                className="rounded-2xl border border-(--line) bg-(--surface) p-5 shadow-[0_10px_30px_rgb(17_24_39/04)]"
+              >
+                <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-(--surface-tint) text-(--brand)">
+                  <Icon className="h-4 w-4" />
+                </div>
+                <p className="text-sm text-(--muted)">{label}</p>
+                <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
+              </div>
+            ))}
+          </section>
+
+          <section className="rounded-2xl border border-(--line) bg-(--surface) p-4 shadow-[0_10px_30px_rgb(17_24_39/04)] sm:p-6">
+            <div className="mb-5 flex items-center justify-between gap-4">
+              <div>
+                <h2 className="text-xl font-semibold text-foreground">Recent orders</h2>
+                <p className="text-sm text-(--muted)">Your order history from ChowUp.</p>
+              </div>
+              <span className="rounded-full border border-(--line) bg-(--surface-muted) px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-(--muted)">
+                {orders.length} orders
+              </span>
             </div>
-            <p className="text-sm text-(--muted)">{label}</p>
-            <p className="mt-2 text-2xl font-semibold text-foreground">{value}</p>
-          </div>
-        ))}
-      </section>
 
-      <section className="rounded-2xl border border-(--line) bg-(--surface) p-4 shadow-[0_10px_30px_rgb(17_24_39/04)] sm:p-6">
-        <div className="mb-5 flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-xl font-semibold text-foreground">Recent orders</h2>
-            <p className="text-sm text-(--muted)">Track what you ordered and when it was delivered.</p>
-          </div>
-          <span className="rounded-full border border-(--line) bg-(--surface-muted) px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-(--muted)">
-            {orders.length} orders
-          </span>
-        </div>
+            {orders.length === 0 ? (
+              <p className="rounded-xl bg-(--surface-muted) p-6 text-center text-(--muted)">
+                You don&apos;t have any orders yet.
+              </p>
+            ) : (
+              <div className="space-y-4">
+                {orders.map((order) => (
+                  <article
+                    key={order._id}
+                    className="rounded-xl border border-(--line) bg-(--surface-muted) p-4 md:p-5"
+                  >
+                    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <p className="text-lg font-semibold text-foreground">
+                            Order #{order._id.slice(-8).toUpperCase()}
+                          </p>
+                          <span
+                            className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClasses[order.status]}`}
+                          >
+                            {order.status === "success" ? "Successful" : "Failed"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-(--muted)">
+                          {new Date(order.createdAt).toLocaleDateString("en-US", {
+                            dateStyle: "medium",
+                          })}
+                        </p>
+                      </div>
+                      <p className="text-xl font-semibold text-foreground">
+                        {formatCurrency(order.amount)}
+                      </p>
+                    </div>
 
-        <div className="space-y-4">
-          {orders.map((order) => (
-            <article
-              key={order.id}
-              className="rounded-xl border border-(--line) bg-(--surface-muted) p-4 md:p-5"
-            >
-              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <p className="text-lg font-semibold text-foreground">{order.id}</p>
-                    <span
-                      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusClasses[order.status]}`}
-                    >
-                      {order.status}
-                    </span>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-(--muted)">
-                    <span className="inline-flex items-center gap-1.5">
-                      <CalendarDays className="h-4 w-4" />
-                      {order.date}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5">
-                      <MapPin className="h-4 w-4" />
-                      {order.location}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="text-left md:text-right">
-                  <p className="text-sm text-(--muted)">{order.eta}</p>
-                  <p className="mt-1 text-xl font-semibold text-foreground">{formatCurrency(order.total)}</p>
-                </div>
+                    <div className="mt-4 flex flex-wrap gap-2 border-t border-(--line) pt-4">
+                      {order.products.map((product, index) => (
+                        <span
+                          key={`${order._id}-${product.name}-${index}`}
+                          className="rounded-full border border-(--line) bg-white/50 px-2.5 py-1 text-xs font-medium text-(--brand-dark)"
+                        >
+                          {product.name} × {product.quantity}
+                        </span>
+                      ))}
+                    </div>
+                  </article>
+                ))}
               </div>
-
-              <div className="mt-4 flex flex-col gap-4 border-t border-(--line) pt-4 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {order.items.map((item) => (
-                    <span
-                      key={`${order.id}-${item}`}
-                      className="rounded-full border border-(--line) bg-white/50 px-2.5 py-1 text-xs font-medium text-(--brand-dark)"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
-
-                <Link
-                  href="/products"
-                  className="inline-flex items-center justify-center gap-2 rounded-md border border-(--line) px-3.5 py-2 text-sm font-medium text-(--brand-dark) transition-colors hover:bg-(--surface-tint)"
-                >
-                  View details
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+            )}
+          </section>
+        </>
+      )}
     </main>
   );
 };
