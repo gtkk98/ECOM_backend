@@ -1,14 +1,17 @@
 import { getAuth } from "@clerk/fastify";
 import { FastifyReply, FastifyRequest } from "fastify";
-import type {CustomJwtSessionClaims} from "@repo/types";
+import type { CustomJwtSessionClaims } from "@repo/types";
 
 declare module "fastify" {
-    interface FastifyRequest {
-        userId: string;
-    }
+  interface FastifyRequest {
+    userId: string;
+  }
 }
 
-export const shouldBeUser = async (request: FastifyRequest, reply: FastifyReply) => {
+export const shouldBeUser = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
   const { userId } = getAuth(request);
   if (!userId) {
     return reply.status(401).send({ message: "You are not logged in!" });
@@ -17,16 +20,19 @@ export const shouldBeUser = async (request: FastifyRequest, reply: FastifyReply)
   request.userId = userId;
 };
 
-export const shouldBeAdmin = async (request: FastifyRequest, reply: FastifyReply) => {
+export const shouldBeAdmin = async (
+  request: FastifyRequest,
+  reply: FastifyReply,
+) => {
   const auth = getAuth(request);
   if (!auth.userId) {
     return reply.status(401).send({ message: "You are not logged in!" });
   }
 
-  const claims = auth.sessionClaims as CustomJwtSessionClaims
+  const claims = auth.sessionClaims as CustomJwtSessionClaims;
 
-  if(claims.metadata?.role !== "admin"){
-    return reply.status(403).send({ message:"Unathorized!"})
+  if (claims.metadata?.role !== "admin") {
+    return reply.status(403).send({ message: "Unathorized!" });
   }
 
   request.userId = auth.userId;
