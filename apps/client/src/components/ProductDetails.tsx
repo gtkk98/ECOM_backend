@@ -1,9 +1,15 @@
 "use client";
 
-import { ProductType } from "@/types";
+import { ProductType } from "@repo/types";
 import useCartStore from "@/stores/cartStore";
 import PaymentMethodIcons from "@/components/PaymentMethodIcons";
-import { ArrowLeft, Minus, Plus, ShoppingBag, ShoppingCart } from "lucide-react";
+import {
+  ArrowLeft,
+  Minus,
+  Plus,
+  ShoppingBag,
+  ShoppingCart,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -12,24 +18,64 @@ import { toast } from "react-toastify";
 
 const ProductDetails = ({ product }: { product: ProductType }) => {
   const router = useRouter();
+  type ProductPortion = { name: string; price: number };
+
+  const productPortions: ProductPortion[] = Array.isArray(product.portions)
+    ? product.portions.filter(
+        (portion): portion is ProductPortion =>
+          typeof portion === "object" &&
+          portion !== null &&
+          "name" in portion &&
+          typeof portion.name === "string" &&
+          "price" in portion &&
+          typeof portion.price === "number",
+      )
+    : [];
+  const images =
+    typeof product.images === "object" &&
+    product.images !== null &&
+    !Array.isArray(product.images)
+      ? (product.images as {
+          primary?: string;
+          gallery?: string[];
+          thumbnail?: string;
+        })
+      : { primary: "", gallery: [], thumbnail: "" };
   const galleryImages = Array.from(
-    new Set([product.images.primary, ...product.images.gallery].filter(Boolean)),
+    new Set(
+      [images.primary ?? "", ...(images.gallery ?? [])].filter(
+        (image): image is string =>
+          typeof image === "string" && image.length > 0,
+      ),
+    ),
   );
   const [selectedImage, setSelectedImage] = useState(
-    galleryImages[0] ?? product.images.thumbnail,
+    galleryImages[0] ?? images.thumbnail ?? "",
   );
-  const [selectedPortion, setSelectedPortion] = useState(product.portions[0]);
+  const [selectedPortion, setSelectedPortion] = useState(
+    () => productPortions[0] ?? { name: "", price: 0 },
+  );
   const [quantity, setQuantity] = useState(1);
   const addToCart = useCartStore((state) => state.addToCart);
-  const tastes = Array.isArray(product.taste) ? product.taste : [product.taste];
+  const tastes = Array.isArray(product.taste)
+    ? product.taste.filter((taste): taste is string => typeof taste === "string")
+    : typeof product.taste === "string"
+      ? [product.taste]
+      : [];
+
+  const cartProduct = {
+    ...product,
+    quantity,
+    selectedPortion: selectedPortion.name,
+  };
 
   const handleAddToCart = () => {
-    addToCart(product, selectedPortion, quantity);
+    addToCart(cartProduct as never, selectedPortion, quantity);
     toast.success(`${quantity} × ${product.name} added to cart`);
   };
 
   const handleBuyNow = () => {
-    addToCart(product, selectedPortion, quantity);
+    addToCart(cartProduct as never, selectedPortion, quantity);
     router.push("/cart?step=2");
   };
 
@@ -65,7 +111,9 @@ const ProductDetails = ({ product }: { product: ProductType }) => {
                   aria-label={`Show product image ${index + 1}`}
                   aria-pressed={selectedImage === image}
                   className={`relative aspect-square overflow-hidden rounded-md border-2 ${
-                    selectedImage === image ? "border-(--brand)" : "border-transparent"
+                    selectedImage === image
+                      ? "border-(--brand)"
+                      : "border-transparent"
                   }`}
                 >
                   <Image
@@ -105,24 +153,29 @@ const ProductDetails = ({ product }: { product: ProductType }) => {
             ))}
           </div>
 
-          <p className="max-w-prose leading-7 text-foreground">{product.description}</p>
+          <p className="max-w-prose leading-7 text-foreground">
+            {product.description}
+          </p>
 
           <div className="w-full border-y border-(--line) py-5">
-            <label htmlFor="product-portion" className="mb-2 block text-sm font-medium text-foreground">
+            <label
+              htmlFor="product-portion"
+              className="mb-2 block text-sm font-medium text-foreground"
+            >
               Portion
             </label>
             <select
               id="product-portion"
               value={selectedPortion.name}
               onChange={(event) => {
-                const portion = product.portions.find(
+                const portion = productPortions.find(
                   (option) => option.name === event.target.value,
                 );
                 if (portion) setSelectedPortion(portion);
               }}
               className="w-full rounded-md border border-(--line) bg-(--surface) px-3 py-2 text-sm text-foreground focus:border-(--brand) focus:outline-none focus:ring-2 focus:ring-(--focus)"
             >
-              {product.portions.map((portion) => (
+              {productPortions.map((portion) => (
                 <option key={portion.name} value={portion.name}>
                   {portion.name} - ${portion.price.toFixed(2)}
                 </option>
@@ -135,18 +188,25 @@ const ProductDetails = ({ product }: { product: ProductType }) => {
               ${selectedPortion.price.toFixed(2)}
             </p>
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-(--muted)">Quantity</span>
+              <span className="text-sm font-medium text-(--muted)">
+                Quantity
+              </span>
               <div className="flex items-center rounded-md border border-(--line)">
                 <button
                   type="button"
-                  onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+                  onClick={() =>
+                    setQuantity((current) => Math.max(1, current - 1))
+                  }
                   aria-label="Decrease quantity"
                   disabled={quantity <= 1}
                   className="flex h-10 w-10 items-center justify-center text-foreground hover:bg-(--surface-muted) disabled:cursor-not-allowed disabled:text-(--muted)"
                 >
                   <Minus className="h-4 w-4" />
                 </button>
-                <span className="min-w-8 text-center tabular-nums" aria-live="polite">
+                <span
+                  className="min-w-8 text-center tabular-nums"
+                  aria-live="polite"
+                >
                   {quantity}
                 </span>
                 <button

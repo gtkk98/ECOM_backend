@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
-import { shippingFormSchema, type ShippingFormInputs } from "@/types";
+import { shippingFormSchema, type ShippingFormInputs } from "@repo/types";
 
 const ShippingForm = ({
     onSubmit,

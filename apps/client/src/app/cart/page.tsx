@@ -1,9 +1,8 @@
 "use client";
 
-import PaymentForm from "@/components/PaymentForm";
 import ShippingForm from "@/components/ShippingForm";
 import useCartStore from "@/stores/cartStore";
-import { type ShippingFormInputs } from "@/types";
+import { type ShippingFormInputs } from "@repo/types";
 import { ArrowRight, Minus, Plus, Trash2 } from "lucide-react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -111,8 +110,12 @@ const CartPageContent = () => {
 
   const activeStep = parseInt(searchParams.get("step") || "1");
 
-  const {cart, decreaseQuantity, increaseQuantity, removeFromCart} = useCartStore();
-  const itemCount = cart.reduce((count, item) => count + (item.quantity ?? 1), 0);
+  const { cart, decreaseQuantity, increaseQuantity, removeFromCart } =
+    useCartStore();
+  const itemCount = cart.reduce(
+    (count, item) => count + (item.quantity ?? 1),
+    0,
+  );
 
   return (
     <div className="flex flex-col gap-8 items-center justify-center mt-12">
@@ -151,67 +154,104 @@ const CartPageContent = () => {
         {/** STEPS */}
         <div className="w-full lg:w-7/12 rounded-lg border border-(--line) bg-(--surface) p-8 shadow-lg flex flex-col gap-8">
           {activeStep === 1 ? (
-            cart.map((item) => (
-              <div
-                className="flex items-center justify-between"
-                key={`${item.id}-${item.selectedPortion ?? item.portions[0]?.name ?? "default"}`}
-              >
-                {/** IMAGE AND DETAILS */}
-                <div className="flex gap-8">
-                  {/**IMAGE */}
-                  <div className="relative h-32 w-32 bg-(--surface-muted) rounded-lg overflow-hidden">
-                    <Image
-                      src={item.images.primary}
-                      alt={item.name}
-                      fill
-                      className="object-contain"
-                    />
-                  </div>
-                  {/**ITEM DETAILS */}
-                  <div className="flex flex-col justify-between">
-                    <div className="flex flex-col gap-1">
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-(--muted) capitalize">
-                        {item.selectedPortion ?? item.portions[0]?.name} portion
-                      </p>
-                      <div className="flex items-center gap-2" aria-label={`Quantity for ${item.name}`}>
-                        <button
-                          type="button"
-                          onClick={() => decreaseQuantity(item)}
-                          aria-label={`Decrease quantity of ${item.name}`}
-                          className="flex h-7 w-7 items-center justify-center rounded border border-(--line) text-foreground hover:bg-(--surface-muted)"
-                        >
-                          <Minus className="h-3 w-3" />
-                        </button>
-                        <span className="min-w-5 text-center text-sm tabular-nums" aria-live="polite">
-                          {item.quantity ?? 1}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => increaseQuantity(item)}
-                          aria-label={`Increase quantity of ${item.name}`}
-                          className="flex h-7 w-7 items-center justify-center rounded border border-(--line) text-foreground hover:bg-(--surface-muted)"
-                        >
-                          <Plus className="h-3 w-3" />
-                        </button>
-                      </div>
+            cart.map((item) => {
+              const itemPortions = Array.isArray(item.portions)
+                ? item.portions.filter(
+                    (
+                      portion,
+                    ): portion is { name: string; price?: number | string } =>
+                      typeof portion === "object" &&
+                      portion !== null &&
+                      "name" in portion &&
+                      typeof portion.name === "string",
+                  )
+                : [];
+              const selectedPortionName =
+                typeof item.selectedPortion === "string"
+                  ? item.selectedPortion
+                  : (itemPortions[0]?.name ?? null);
+              const selectedPortion =
+                itemPortions.find(
+                  (portion) => portion.name === selectedPortionName,
+                ) ?? null;
+
+              const itemImageSrc =
+                typeof item.images === "object" &&
+                item.images !== null &&
+                "primary" in item.images &&
+                typeof item.images.primary === "string"
+                  ? item.images.primary
+                  : "/placeholder.png";
+
+              return (
+                <div
+                  className="flex items-center justify-between"
+                  key={`${item.id}-${selectedPortionName ?? "default"}`}
+                >
+                  {/** IMAGE AND DETAILS */}
+                  <div className="flex gap-8">
+                    {/**IMAGE */}
+                    <div className="relative h-32 w-32 bg-(--surface-muted) rounded-lg overflow-hidden">
+                      <Image
+                        src={itemImageSrc}
+                        alt={item.name}
+                        fill
+                        className="object-contain"
+                      />
                     </div>
-                    <p className="font-medium">
-                      ${" "}
-                      {(
-                        item.portions.find(
-                          (portion) => portion.name === item.selectedPortion,
-                        )?.price ?? 0
-                      ).toFixed(2)}
-                    </p>
+                    {/**ITEM DETAILS */}
+                    <div className="flex flex-col justify-between">
+                      <div className="flex flex-col gap-1">
+                        <p className="font-medium">{item.name}</p>
+                        <p className="text-sm text-(--muted) capitalize">
+                          {selectedPortionName
+                            ? `${selectedPortionName} portion`
+                            : "Portion not selected"}
+                        </p>
+                        <div
+                          className="flex items-center gap-2"
+                          aria-label={`Quantity for ${item.name}`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => decreaseQuantity(item)}
+                            aria-label={`Decrease quantity of ${item.name}`}
+                            className="flex h-7 w-7 items-center justify-center rounded border border-(--line) text-foreground hover:bg-(--surface-muted)"
+                          >
+                            <Minus className="h-3 w-3" />
+                          </button>
+                          <span
+                            className="min-w-5 text-center text-sm tabular-nums"
+                            aria-live="polite"
+                          >
+                            {item.quantity ?? 1}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => increaseQuantity(item)}
+                            aria-label={`Increase quantity of ${item.name}`}
+                            className="flex h-7 w-7 items-center justify-center rounded border border-(--line) text-foreground hover:bg-(--surface-muted)"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
+                      </div>
+                      <p className="font-medium">
+                        ${" "}
+                        {(Number(selectedPortion?.price ?? 0) || 0).toFixed(2)}
+                      </p>
+                    </div>
                   </div>
+                  {/** DELETE BUTTON */}
+                  <button
+                    onClick={() => removeFromCart(item)}
+                    className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-300 text-red-400 flex items-center justify-center cursor-pointer "
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
                 </div>
-                {/** DELETE BUTTON */}
-                <button onClick={() =>removeFromCart(item) } className="w-8 h-8 rounded-full bg-red-100 hover:bg-red-200 transition-all duration-300 text-red-400 flex items-center justify-center cursor-pointer ">
-                  <Trash2 className="w-3 h-3" />
-                </button>
-              </div>
-            ))
+              );
+            })
           ) : activeStep === 2 ? (
             <ShippingForm
               onSubmit={(values) => {
@@ -220,7 +260,7 @@ const CartPageContent = () => {
               }}
             />
           ) : activeStep === 3 && shippingForm ? (
-            <PaymentForm />
+            "TODO: add Stripe form"
           ) : (
             <p className="text-sm text-(--muted)">
               Please fill in the shipping form to continue.
@@ -237,14 +277,32 @@ const CartPageContent = () => {
                 ${" "}
                 {cart
                   .reduce((acc, item) => {
+                    const itemPortions = Array.isArray(item.portions)
+                      ? item.portions.filter(
+                          (
+                            portion,
+                          ): portion is {
+                            name: string;
+                            price?: number | string;
+                          } =>
+                            typeof portion === "object" &&
+                            portion !== null &&
+                            "name" in portion &&
+                            typeof portion.name === "string",
+                        )
+                      : [];
+                    const selectedPortionName =
+                      item.selectedPortion ?? itemPortions[0]?.name ?? null;
                     const selectedPortion =
-                      item.portions.find(
-                        (portion) =>
-                          portion.name ===
-                          (item.selectedPortion ?? item.portions[0]?.name),
+                      itemPortions.find(
+                        (portion) => portion.name === selectedPortionName,
                       ) ?? null;
 
-                    return acc + (selectedPortion?.price ?? 0) * (item.quantity ?? 1);
+                    return (
+                      acc +
+                      Number(selectedPortion?.price ?? 0) *
+                        Number(item.quantity ?? 1)
+                    );
                   }, 0)
                   .toFixed(2)}
               </p>
@@ -268,14 +326,32 @@ const CartPageContent = () => {
                 ${" "}
                 {cart
                   .reduce((acc, item) => {
+                    const itemPortions = Array.isArray(item.portions)
+                      ? item.portions.filter(
+                          (
+                            portion,
+                          ): portion is {
+                            name: string;
+                            price?: number | string;
+                          } =>
+                            typeof portion === "object" &&
+                            portion !== null &&
+                            "name" in portion &&
+                            typeof portion.name === "string",
+                        )
+                      : [];
+                    const selectedPortionName =
+                      item.selectedPortion ?? itemPortions[0]?.name ?? null;
                     const selectedPortion =
-                      item.portions.find(
-                        (portion) =>
-                          portion.name ===
-                          (item.selectedPortion ?? item.portions[0]?.name),
+                      itemPortions.find(
+                        (portion) => portion.name === selectedPortionName,
                       ) ?? null;
 
-                    return acc + (selectedPortion?.price ?? 0) * (item.quantity ?? 1);
+                    return (
+                      acc +
+                      Number(selectedPortion?.price ?? 0) *
+                        Number(item.quantity ?? 1)
+                    );
                   }, 0)
                   .toFixed(2)}
               </p>
@@ -297,7 +373,13 @@ const CartPageContent = () => {
 };
 
 const CartPage = () => (
-  <Suspense fallback={<div className="py-12 text-center text-sm text-(--muted)">Loading cart...</div>}>
+  <Suspense
+    fallback={
+      <div className="py-12 text-center text-sm text-(--muted)">
+        Loading cart...
+      </div>
+    }
+  >
     <CartPageContent />
   </Suspense>
 );
