@@ -1,11 +1,12 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { clerkMiddleware, getAuth } from "@hono/clerk-auth";
-import { shouldBeUser } from "./middleware/authMiddleware.js";
-import stripe from "./utils/stripe.js";
+import { clerkMiddleware } from "@hono/clerk-auth";
+import sessionRoute from "./routes/session.route.js";
+import { cors } from "hono/cors";
 
 const app = new Hono();
 app.use("*", clerkMiddleware());
+app.use("*", cors({ origin: ["http://localhost:3002"] }));
 const startedAt = Date.now();
 
 app.get("/health", (c) => {
@@ -15,6 +16,8 @@ app.get("/health", (c) => {
     timestamp: Date.now(),
   });
 });
+
+app.route("/sessions", sessionRoute);
 // app.post("/create-stripe-product", async (c) => {
 //   // const { product } = await c.req.json();
 
